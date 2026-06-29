@@ -30,8 +30,6 @@
         .loading, .empty-msg { text-align: center; padding: 60px 20px; color: #555; }
         .spinner { width: 36px; height: 36px; border: 3px solid #1a1a1a; border-top-color: #e50914; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: #fff; padding: 10px 24px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
-        .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
@@ -50,16 +48,21 @@
         </div>
         <div class="player-container" id="playerContainer"></div>
     </div>
-    <div class="toast" id="toast"></div>
+
     <script>
+       
         const CONFIG_URL = 'https://3maymo.github.io/player-config/config.json';
+
         let config = null, currentSource = null, currentPage = 1, isLoading = false, hasMore = true;
 
-        async function init() {
+        async function loadConfig() {
             try {
-                const res = await fetch(CONFIG_URL + '?t=' + Date.now());
-                config = await res.json();
+                const response = await fetch(CONFIG_URL + '?t=' + Date.now());
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                config = await response.json();
+                alert('配置加载成功！共 ' + config.sites.length + ' 个站点');
             } catch(e) {
+                alert('配置加载失败: ' + e.message);
                 config = { sites: [] };
             }
             document.getElementById('sourceCount').textContent = config.sites.filter(s => s.enabled !== false).length + '个源';
@@ -115,7 +118,7 @@
                     currentPage++;
                 }
             } catch(e) {
-                if (currentPage === 1) document.getElementById('videoGrid').innerHTML = '<div class="empty-msg">加载失败</div>';
+                if (currentPage === 1) document.getElementById('videoGrid').innerHTML = '<div class="empty-msg">加载失败: ' + e.message + '</div>';
             }
             isLoading = false;
         }
@@ -124,12 +127,12 @@
             document.getElementById('playerPage').classList.add('active');
             document.getElementById('playerTitle').textContent = title;
             document.getElementById('playerContainer').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-            const site = config.sites[currentSource];
             try {
                 const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(link);
                 const res = await fetch(proxy);
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
+                const site = config.sites[currentSource];
                 let videoUrl = '';
                 const vEl = doc.querySelector(site.detailRule.videoSelector);
                 if (vEl) videoUrl = vEl.getAttribute(site.detailRule.videoAttr) || '';
@@ -154,7 +157,7 @@
             if (scrollTop + clientHeight >= scrollHeight - 300) loadVideos();
         });
 
-        init();
+        loadConfig();
     </script>
 </body>
 </html>
