@@ -84,44 +84,51 @@
             loadVideos();
         }
 
-        async function loadVideos() {
-            if (isLoading || !hasMore) return;
-            isLoading = true;
-            const site = config.sites[currentSource];
-            const r = site.listRule;
-            let url = site.baseUrl + r.url;
-            if (r.pageParam) url += (url.includes('?')?'&':'?') + r.pageParam + '=' + currentPage;
-            try {
-                const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-                const res = await fetch(proxy);
-                const html = await res.text();
-                const doc = new DOMParser().parseFromString(html, 'text/html');
-                const items = doc.querySelectorAll(r.itemSelector);
-                if (currentPage === 1) document.getElementById('videoGrid').innerHTML = '';
-                if (items.length === 0 && currentPage === 1) {
-                    document.getElementById('videoGrid').innerHTML = '<div class="empty-msg">暂无内容</div>';
-                } else if (items.length === 0) {
-                    hasMore = false;
-                } else {
-                    items.forEach(item => {
-                        const title = (r.titleSelector ? item.querySelector(r.titleSelector) : item)?.textContent?.trim() || '无标题';
-                        let link = item.getAttribute(r.linkAttr) || item.querySelector('a')?.getAttribute('href') || '';
-                        if (link && !link.startsWith('http')) link = site.baseUrl + (link.startsWith('/')?'':'/') + link;
-                        if (title && link) {
-                            const card = document.createElement('div');
-                            card.className = 'video-card';
-                            card.onclick = () => openPlayer(title, link);
-                            card.innerHTML = `<div class="poster">🎬</div><div class="title">${title}</div>`;
-                            document.getElementById('videoGrid').appendChild(card);
-                        }
-                    });
-                    currentPage++;
+    async function loadVideos() {
+    if (isLoading || !hasMore) return;
+    isLoading = true;
+    const site = config.sites[currentSource];
+    const r = site.listRule;
+    let url = site.baseUrl + r.url;
+    if (r.pageParam) url += (url.includes('?')?'&':'?') + r.pageParam + '=' + currentPage;
+    try {
+        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const res = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error('HTTP错误: ' + res.status);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const items = doc.querySelectorAll(r.itemSelector);
+        if (currentPage === 1) document.getElementById('videoGrid').innerHTML = '';
+        if (items.length === 0 && currentPage === 1) {
+            document.getElementById('videoGrid').innerHTML = '<div class="empty-msg">暂无内容，请检查选择器或网页结构</div>';
+        } else if (items.length === 0) {
+            hasMore = false;
+        } else {
+            items.forEach(item => {
+                const title = (r.titleSelector ? item.querySelector(r.titleSelector) : item)?.textContent?.trim() || '无标题';
+                let link = item.getAttribute(r.linkAttr) || item.querySelector('a')?.getAttribute('href') || '';
+                if (link && !link.startsWith('http')) link = site.baseUrl + (link.startsWith('/')?'':'/') + link;
+                if (title && link) {
+                    const card = document.createElement('div');
+                    card.className = 'video-card';
+                    card.onclick = () => openPlayer(title, link);
+                    card.innerHTML = `<div class="poster">🎬</div><div class="title">${title}</div>`;
+                    document.getElementById('videoGrid').appendChild(card);
                 }
-            } catch(e) {
-                if (currentPage === 1) document.getElementById('videoGrid').innerHTML = '<div class="empty-msg">加载失败: ' + e.message + '</div>';
-            }
-            isLoading = false;
+            });
+            currentPage++;
         }
+    } catch(e) {
+        if (currentPage === 1) {
+            document.getElementById('videoGrid').innerHTML = '<div class="empty-msg">加载失败: 网络超时或目标站无法访问。<br>可尝试更换代理或检查网址。</div>';
+        }
+    }
+    isLoading = false;
+}
 
         async function openPlayer(title, link) {
             document.getElementById('playerPage').classList.add('active');
