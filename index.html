@@ -92,7 +92,7 @@
     let url = site.baseUrl + r.url;
     if (r.pageParam) url += (url.includes('?')?'&':'?') + r.pageParam + '=' + currentPage;
     try {
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
